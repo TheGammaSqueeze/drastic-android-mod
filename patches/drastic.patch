@@ -1,0 +1,257 @@
+--- decoded/smali/com/dsemu/drastic/DraSticEmuActivity.smali	2026-04-10 09:10:31.343843100 +0100
++++ decoded2/smali/com/dsemu/drastic/DraSticEmuActivity.smali	2026-04-10 11:47:07.939165000 +0100
+@@ -1142,6 +1142,15 @@
+     iput v0, p0, Lcom/dsemu/drastic/DraSticEmuActivity;->o:I
+ 
+     :cond_8
++    iget-object v0, p0, Lcom/dsemu/drastic/DraSticEmuActivity;->n:Lcom/dsemu/drastic/filesystem/b;
++
++    if-eqz v0, :cond_force_skip
++
++    const/16 v0, 0x9
++
++    iput v0, p0, Lcom/dsemu/drastic/DraSticEmuActivity;->o:I
++
++    :cond_force_skip
+     invoke-static {}, Ljava/lang/System;->currentTimeMillis()J
+ 
+     move-result-wide v3
+@@ -1545,6 +1554,25 @@
+ 
+     move-result p2
+ 
++    const/16 v0, 0x6f
++
++    if-ne p1, v0, :cond_esc_skip
++
++    if-nez p2, :cond_esc_skip
++
++    const/16 v0, 0x9
++
++    const/4 v1, 0x1
++
++    invoke-static {v0, v1}, Lcom/dsemu/drastic/DraSticJNI;->saveState(IZ)Z
++
++    invoke-virtual {p0}, Landroid/app/Activity;->finishAffinity()V
++
++    const/4 v0, 0x1
++
++    return v0
++
++    :cond_esc_skip
+     const/4 v0, 0x0
+ 
+     const/4 v1, 0x0
+@@ -1811,7 +1839,7 @@
+ 
+     const/4 v2, 0x0
+ 
+-    if-ne v1, v0, :cond_3
++    nop
+ 
+     const/4 v1, 0x1
+ 
+@@ -1836,6 +1864,8 @@
+ 
+     xor-int/2addr v0, v1
+ 
++    const/4 v0, 0x1
++
+     const/16 v1, 0x9
+ 
+     invoke-static {v1, v0}, Lcom/dsemu/drastic/DraSticJNI;->saveState(IZ)Z
+--- decoded/smali/n0/h.smali	2026-04-10 09:10:33.944121700 +0100
++++ decoded2/smali/n0/h.smali	2026-04-10 13:47:11.309314132 +0100
+@@ -335,3 +335,59 @@
+     :cond_3
+     return-object p1
+ .end method
++
++.method public aUi(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
++    .locals 3
++
++    invoke-virtual {p1}, Landroid/view/KeyEvent;->getKeyCode()I
++
++    move-result v0
++
++    const/16 v1, 0x61
++
++    if-ne v0, v1, :cond_0
++
++    invoke-virtual {p1}, Landroid/view/KeyEvent;->getAction()I
++
++    move-result v0
++
++    new-instance v1, Landroid/view/KeyEvent;
++
++    const/16 v2, 0x42
++
++    invoke-direct {v1, v0, v2}, Landroid/view/KeyEvent;-><init>(II)V
++
++    invoke-virtual {p0, v1}, Ln0/h;->a(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
++
++    move-result-object p1
++
++    return-object p1
++
++    :cond_0
++    const/16 v1, 0x60
++
++    if-ne v0, v1, :cond_1
++
++    invoke-virtual {p1}, Landroid/view/KeyEvent;->getAction()I
++
++    move-result v0
++
++    new-instance v1, Landroid/view/KeyEvent;
++
++    const/4 v2, 0x4
++
++    invoke-direct {v1, v0, v2}, Landroid/view/KeyEvent;-><init>(II)V
++
++    invoke-virtual {p0, v1}, Ln0/h;->a(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
++
++    move-result-object p1
++
++    return-object p1
++
++    :cond_1
++    invoke-virtual {p0, p1}, Ln0/h;->a(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
++
++    move-result-object p1
++
++    return-object p1
++.end method
+--- decoded/smali/m0/y.smali	2026-04-10 09:10:33.824745800 +0100
++++ decoded2/smali/m0/y.smali	2026-04-10 13:46:49.931323771 +0100
+@@ -605,11 +605,11 @@
+ 
+     move-result p1
+ 
+-    const/16 v0, 0x60
++    const/16 v0, 0x61
+ 
+     if-eq p1, v0, :cond_2
+ 
+-    const/16 v0, 0x61
++    const/16 v0, 0x60
+ 
+     if-eq p1, v0, :cond_1
+ 
+@@ -1346,7 +1346,7 @@
+ 
+     if-eq p1, v3, :cond_7
+ 
+-    const/16 v3, 0x60
++    const/16 v3, 0x61
+ 
+     if-ne p1, v3, :cond_4
+ 
+@@ -1363,7 +1363,7 @@
+ 
+     if-eq p1, v0, :cond_6
+ 
+-    const/16 v0, 0x61
++    const/16 v0, 0x60
+ 
+     if-ne p1, v0, :cond_5
+ 
+--- decoded/smali/com/dsemu/drastic/DraSticActivity.smali	2026-04-10 09:10:31.272525300 +0100
++++ decoded2/smali/com/dsemu/drastic/DraSticActivity.smali	2026-04-10 13:32:41.157739252 +0100
+@@ -6692,7 +6692,7 @@
+ 
+     iget-object v0, p0, Lcom/dsemu/drastic/DraSticActivity;->t:Ln0/h;
+ 
+-    invoke-virtual {v0, p1}, Ln0/h;->a(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
++    invoke-virtual {v0, p1}, Ln0/h;->aUi(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
+ 
+     move-result-object p1
+ 
+--- decoded/smali/com/dsemu/drastic/ui/RomSelector.smali	2026-04-10 09:10:31.934159600 +0100
++++ decoded2/smali/com/dsemu/drastic/ui/RomSelector.smali	2026-04-10 13:32:41.179739254 +0100
+@@ -1427,7 +1427,7 @@
+ 
+     iget-object v0, p0, Lcom/dsemu/drastic/ui/RomSelector;->l:Ln0/h;
+ 
+-    invoke-virtual {v0, p1}, Ln0/h;->a(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
++    invoke-virtual {v0, p1}, Ln0/h;->aUi(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
+ 
+     move-result-object p1
+ 
+--- decoded/smali/com/dsemu/drastic/ui/StateMenu.smali	2026-04-10 09:10:32.087742700 +0100
++++ decoded2/smali/com/dsemu/drastic/ui/StateMenu.smali	2026-04-10 13:32:41.197339252 +0100
+@@ -3122,7 +3122,7 @@
+ 
+     iget-object v0, p0, Lcom/dsemu/drastic/ui/StateMenu;->o:Ln0/h;
+ 
+-    invoke-virtual {v0, p1}, Ln0/h;->a(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
++    invoke-virtual {v0, p1}, Ln0/h;->aUi(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
+ 
+     move-result-object p1
+ 
+--- decoded/smali/com/dsemu/drastic/ui/Cheats.smali	2026-04-10 09:10:31.663527000 +0100
++++ decoded2/smali/com/dsemu/drastic/ui/Cheats.smali	2026-04-10 13:32:41.201739252 +0100
+@@ -624,7 +624,7 @@
+ 
+     iget-object v0, p0, Lcom/dsemu/drastic/ui/Cheats;->e:Ln0/h;
+ 
+-    invoke-virtual {v0, p1}, Ln0/h;->a(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
++    invoke-virtual {v0, p1}, Ln0/h;->aUi(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
+ 
+     move-result-object p1
+ 
+--- decoded/smali/com/dsemu/drastic/ui/CheatEditor.smali	2026-04-10 09:10:31.643326900 +0100
++++ decoded2/smali/com/dsemu/drastic/ui/CheatEditor.smali	2026-04-10 13:32:41.201739252 +0100
+@@ -403,7 +403,7 @@
+ 
+     iget-object v0, p0, Lcom/dsemu/drastic/ui/CheatEditor;->e:Ln0/h;
+ 
+-    invoke-virtual {v0, p1}, Ln0/h;->a(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
++    invoke-virtual {v0, p1}, Ln0/h;->aUi(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
+ 
+     move-result-object p1
+ 
+--- decoded/smali/com/dsemu/drastic/ui/CheatsCustom.smali	2026-04-10 09:10:31.701371000 +0100
++++ decoded2/smali/com/dsemu/drastic/ui/CheatsCustom.smali	2026-04-10 13:32:41.210539253 +0100
+@@ -488,7 +488,7 @@
+ 
+     iget-object v0, p0, Lcom/dsemu/drastic/ui/CheatsCustom;->f:Ln0/h;
+ 
+-    invoke-virtual {v0, p1}, Ln0/h;->a(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
++    invoke-virtual {v0, p1}, Ln0/h;->aUi(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
+ 
+     move-result-object p1
+ 
+--- decoded/smali/com/dsemu/drastic/ui/GameMenu.smali	2026-04-10 09:10:31.811249100 +0100
++++ decoded2/smali/com/dsemu/drastic/ui/GameMenu.smali	2026-04-10 13:32:41.219339253 +0100
+@@ -316,7 +316,7 @@
+ 
+     iget-object v0, p0, Lcom/dsemu/drastic/ui/GameMenu;->h:Ln0/h;
+ 
+-    invoke-virtual {v0, p1}, Ln0/h;->a(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
++    invoke-virtual {v0, p1}, Ln0/h;->aUi(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
+ 
+     move-result-object p1
+ 
+--- decoded/smali/com/dsemu/drastic/ui/Help.smali	2026-04-10 09:10:31.826861800 +0100
++++ decoded2/smali/com/dsemu/drastic/ui/Help.smali	2026-04-10 13:32:41.223739254 +0100
+@@ -408,7 +408,7 @@
+ 
+     iget-object v0, p0, Lcom/dsemu/drastic/ui/Help;->k:Ln0/h;
+ 
+-    invoke-virtual {v0, p1}, Ln0/h;->a(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
++    invoke-virtual {v0, p1}, Ln0/h;->aUi(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
+ 
+     move-result-object p1
+ 
+--- decoded/smali/com/dsemu/drastic/ui/Settings.smali	2026-04-10 09:10:32.055811900 +0100
++++ decoded2/smali/com/dsemu/drastic/ui/Settings.smali	2026-04-10 13:32:41.236939252 +0100
+@@ -4453,7 +4453,7 @@
+ 
+     iget-object v0, p0, Lcom/dsemu/drastic/ui/Settings;->g:Ln0/h;
+ 
+-    invoke-virtual {v0, p1}, Ln0/h;->a(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
++    invoke-virtual {v0, p1}, Ln0/h;->aUi(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
+ 
+     move-result-object p1
+ 

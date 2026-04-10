@@ -1,0 +1,188 @@
+Functions:    755
+PLT entries:  259
+Strings:      1251
+
+=== JNI exported entries ===
+  0x17df4  size=  100  calls=  1  Java_com_dsemu_drastic_DraSticJNI_onInit
+  0x17e58  size=  120  calls=  3  Java_com_dsemu_drastic_DraSticJNI_getVersionString
+  0x17ed0  size=  180  calls=  3  Java_com_dsemu_drastic_DraSticJNI_getInfoString
+  0x17f84  size=  124  calls=  2  Java_com_dsemu_drastic_DraSticJNI_saveState
+  0x18000  size=   52  calls=  1  Java_com_dsemu_drastic_DraSticJNI_isSaving
+  0x18034  size=   28  calls=  0  Java_com_dsemu_drastic_DraSticJNI_getSavingSlot
+  0x18050  size=   36  calls=  0  Java_com_dsemu_drastic_DraSticJNI_loadState
+  0x18074  size=   40  calls=  0  Java_com_dsemu_drastic_DraSticJNI_getCheatFolderCount
+  0x1809c  size=   40  calls=  0  Java_com_dsemu_drastic_DraSticJNI_getCheatCount
+  0x180c4  size=  156  calls=  3  Java_com_dsemu_drastic_DraSticJNI_getCheatFolderName
+  0x18160  size=  156  calls=  3  Java_com_dsemu_drastic_DraSticJNI_getCheatFolderNote
+  0x181fc  size=   60  calls=  0  Java_com_dsemu_drastic_DraSticJNI_getCheatFolderMultiSelect
+  0x18238  size=   64  calls=  0  Java_com_dsemu_drastic_DraSticJNI_getCheatFolderExpanded
+  0x18278  size=   56  calls=  0  Java_com_dsemu_drastic_DraSticJNI_setCheatFolderExpanded
+  0x182b0  size=  156  calls=  3  Java_com_dsemu_drastic_DraSticJNI_getCheatName
+  0x1834c  size=  156  calls=  3  Java_com_dsemu_drastic_DraSticJNI_getCheatNote
+  0x183e8  size=   52  calls=  0  Java_com_dsemu_drastic_DraSticJNI_getCheatFolderId
+  0x1841c  size=   64  calls=  0  Java_com_dsemu_drastic_DraSticJNI_getCheatEnabled
+  0x1845c  size=   56  calls=  0  Java_com_dsemu_drastic_DraSticJNI_setCheatEnabled
+  0x18494  size=   92  calls=  1  Java_com_dsemu_drastic_DraSticJNI_updateCheats
+  0x184f0  size=   16  calls=  0  Java_com_dsemu_drastic_DraSticJNI_getCustomCheatCount
+  0x18500  size=  144  calls=  3  Java_com_dsemu_drastic_DraSticJNI_getCustomCheatName
+  0x18590  size=   52  calls=  0  Java_com_dsemu_drastic_DraSticJNI_getCustomCheatEnabled
+  0x185c4  size=  100  calls=  1  Java_com_dsemu_drastic_DraSticJNI_setCustomCheatEnabled
+  0x18628  size=  136  calls=  2  Java_com_dsemu_drastic_DraSticJNI_getCustomCheatData
+  0x186b0  size=   88  calls=  2  Java_com_dsemu_drastic_DraSticJNI_removeCustomCheat
+  0x18708  size=  308  calls=  7  Java_com_dsemu_drastic_DraSticJNI_addCustomCheat
+  0x1883c  size=  128  calls=  3  Java_com_dsemu_drastic_DraSticJNI_findCustomCheat
+  0x188bc  size=  104  calls=  3  Java_com_dsemu_drastic_DraSticJNI_isNdsFile
+  0x18924  size=  120  calls=  3  Java_com_dsemu_drastic_DraSticJNI_getRomType
+  0x1899c  size= 1124  calls= 10  Java_com_dsemu_drastic_DraSticJNI_getRomIconData
+  0x18e00  size=  168  calls=  4  Java_com_dsemu_drastic_DraSticJNI_getRomSize
+  0x18ea8  size=  124  calls=  3  Java_com_dsemu_drastic_DraSticJNI_fxLoad
+  0x18f24  size=   28  calls=  0  Java_com_dsemu_drastic_DraSticJNI_fxSetup
+  0x18f40  size=   60  calls=  0  Java_com_dsemu_drastic_DraSticJNI_fxRender
+  0x18f7c  size=  124  calls=  3  Java_com_dsemu_drastic_DraSticJNI_extfxLoad
+  0x18ff8  size=   28  calls=  0  Java_com_dsemu_drastic_DraSticJNI_extfxSetup
+  0x19014  size=   28  calls=  0  Java_com_dsemu_drastic_DraSticJNI_extfxRender
+  0x19030  size=   20  calls=  0  Java_com_dsemu_drastic_DraSticJNI_renderFrame
+  0x19044  size=   12  calls=  0  Java_com_dsemu_drastic_DraSticJNI_renderFrameTex
+  0x19050  size=   12  calls=  0  Java_com_dsemu_drastic_DraSticJNI_renderFrameTexExt
+  0x1905c  size=   12  calls=  0  Java_com_dsemu_drastic_DraSticJNI_clearScreens
+  0x19068  size= 1496  calls=  6  Java_com_dsemu_drastic_DraSticJNI_getScreenBuffers
+  0x19640  size=  516  calls=  4  Java_com_dsemu_drastic_DraSticJNI_getScreenshot
+  0x19844  size=  532  calls=  8  Java_com_dsemu_drastic_DraSticJNI_getSnapshots16
+  0x19a58  size=  728  calls= 10  Java_com_dsemu_drastic_DraSticJNI_getSnapshots16Direct
+  0x19d30  size=  556  calls= 10  Java_com_dsemu_drastic_DraSticJNI_getSnapshots16TopGreyscale
+  0x19f5c  size=  240  calls=  3  Java_com_dsemu_drastic_DraSticJNI_setFirmwareUserdata
+  0x1a04c  size=  660  calls= 15  Java_com_dsemu_drastic_DraSticJNI_startGame
+  0x1a2e0  size=  284  calls=  8  Java_com_dsemu_drastic_DraSticJNI_insertGame
+  0x1a4a0  size=  128  calls=  2  Java_com_dsemu_drastic_DraSticJNI_applyConfig
+  0x1a520  size=   12  calls=  0  Java_com_dsemu_drastic_DraSticJNI_setAutosaveInterval
+  0x1a52c  size=   16  calls=  0  Java_com_dsemu_drastic_DraSticJNI_resetDS
+  0x1a53c  size=  156  calls=  1  Java_com_dsemu_drastic_DraSticJNI_updateFrame
+  0x1a5d8  size=   60  calls=  0  Java_com_dsemu_drastic_DraSticJNI_updateInput
+  0x1a614  size=   28  calls=  0  Java_com_dsemu_drastic_DraSticJNI_updateAccelerometer
+  0x1a630  size=   24  calls=  0  Java_com_dsemu_drastic_DraSticJNI_updateGyroscope
+  0x1a648  size=    4  calls=  0  Java_com_dsemu_drastic_DraSticJNI_signalScreen
+  0x1a64c  size=    4  calls=  0  Java_com_dsemu_drastic_DraSticJNI_waitScreen
+  0x1a650  size=  108  calls=  1  Java_com_dsemu_drastic_DraSticJNI_getFrameInfo
+  0x1a6bc  size=   80  calls=  0  Java_com_dsemu_drastic_DraSticJNI_getPerformanceCounters
+  0x1a70c  size=   20  calls=  0  Java_com_dsemu_drastic_DraSticJNI_setHingeStatus
+  0x1a720  size=   12  calls=  0  Java_com_dsemu_drastic_DraSticJNI_setWhitenoiseFeed
+  0x1a72c  size=   40  calls=  1  Java_com_dsemu_drastic_DraSticJNI_quitSystem
+  0x1a754  size=    8  calls=  0  Java_com_dsemu_drastic_DraSticJNI_releaseSystem
+  0x1a75c  size=  412  calls= 15  Java_com_dsemu_drastic_DraSticJNI_pauseSystem
+  0x1a8f8  size=    8  calls=  0  Java_com_dsemu_drastic_DraSticJNI_setAudioVolume
+  0x1a900  size=   20  calls=  0  Java_com_dsemu_drastic_DraSticJNI_luaUpdateAxisValues
+  0x1a914  size=   12  calls=  0  Java_com_dsemu_drastic_DraSticJNI_luaGetOverrides
+  0x1a920  size=   28  calls=  1  Java_com_dsemu_drastic_DraSticJNI_luaIsActive
+  0x1a93c  size=   28  calls=  0  Java_com_dsemu_drastic_DraSticJNI_luaUpdateRotation
+  0x1a958  size=   20  calls=  0  Java_com_dsemu_drastic_DraSticJNI_getRumbleState
+
+=== PLT call frequency (top 50) ===
+    157 calls from  135 fns: __stack_chk_fail
+    120 calls from   35 fns: memcpy
+     91 calls from   37 fns: free
+     89 calls from   29 fns: memset
+     71 calls from   40 fns: malloc
+     69 calls from    4 fns: fprintf
+     52 calls from   13 fns: fwrite
+     48 calls from   26 fns: fclose
+     40 calls from   21 fns: fseek
+     37 calls from    9 fns: strstr
+     31 calls from   13 fns: realloc
+     31 calls from    5 fns: strcmp
+     29 calls from   16 fns: fread
+     27 calls from   15 fns: ftell
+     25 calls from   15 fns: pthread_mutex_lock
+     23 calls from    9 fns: mmap
+     21 calls from    3 fns: strcasecmp
+     20 calls from   12 fns: fgets
+     18 calls from    9 fns: munmap
+     17 calls from   10 fns: pthread_mutex_unlock
+     15 calls from   15 fns: __vsprintf_chk
+     15 calls from   11 fns: strlen
+     15 calls from    9 fns: glBindTexture
+     14 calls from    4 fns: fputc
+     12 calls from   11 fns: pthread_cond_signal
+     12 calls from    3 fns: pthread_mutex_init
+     12 calls from    5 fns: strchr
+     11 calls from    2 fns: pthread_cond_init
+     10 calls from    3 fns: glTexParameteri
+     10 calls from    9 fns: fflush
+     10 calls from    4 fns: __strcpy_chk
+      9 calls from    7 fns: time
+      9 calls from    7 fns: pthread_cond_wait
+      9 calls from    6 fns: glTexSubImage2D
+      9 calls from    3 fns: lseek
+      8 calls from    3 fns: sscanf
+      7 calls from    5 fns: close
+      7 calls from    5 fns: strrchr
+      7 calls from    2 fns: strtoul
+      6 calls from    5 fns: memcmp
+      6 calls from    3 fns: glUseProgram
+      6 calls from    2 fns: perror
+      6 calls from    3 fns: strncpy
+      6 calls from    4 fns: isspace
+      5 calls from    4 fns: __memcpy_chk
+      5 calls from    3 fns: glActiveTexture
+      5 calls from    3 fns: pthread_create
+      5 calls from    1 fns: strncmp
+      4 calls from    2 fns: mprotect
+      4 calls from    2 fns: glDrawArrays
+
+=== Largest functions (top 30) ===
+  0xde904  size=157812  calls=   0  <anon>
+  0xae5dc  size=111584  calls=   0  <anon>
+  0xcf5b8  size= 62284  calls=   0  <anon>
+  0x99234  size= 45756  calls=   0  <anon>
+  0xa44f0  size= 40720  calls=   0  <anon>
+  0x90c28  size= 18424  calls=   0  <anon>
+  0x2d9fc  size= 15056  calls= 219  <anon>
+  0x39880  size= 12472  calls=  21  <anon>
+  0x41cdc  size= 12324  calls=   3  <anon>
+  0x63c34  size= 10968  calls=  53  <anon>
+  0x82794  size= 10736  calls= 137  <anon>
+  0x85464  size=  9212  calls= 139  <anon>
+  0x494a4  size=  7692  calls=  44  <anon>
+  0x69eb0  size=  7492  calls=   8  <anon>
+  0x66eb0  size=  7260  calls=  12  <anon>
+  0xcc5a0  size=  7080  calls=   0  <anon>
+  0x105178  size=  6984  calls=   0  <anon>
+  0x4c610  size=  6760  calls=  42  <anon>
+  0x97564  size=  6216  calls=   0  <anon>
+  0xc99bc  size=  5616  calls=   0  <anon>
+  0x36584  size=  5488  calls=  13  <anon>
+  0x45868  size=  5404  calls=   0  <anon>
+  0x4b2b0  size=  4960  calls=   4  <anon>
+  0x3e934  size=  4956  calls=   8  <anon>
+  0x961dc  size=  4808  calls=   0  <anon>
+  0x37cd0  size=  4800  calls=  21  <anon>
+  0x3fc90  size=  4792  calls=   6  <anon>
+  0x5c7c0  size=  4724  calls=  60  <anon>
+  0x6ec44  size=  4160  calls=   1  <anon>
+  0x89324  size=  4044  calls=  40  <anon>
+
+=== Functions calling pthread_create ===
+  0x3d3c4  size=  604  <anon>
+  0x5f614  size=  992  <anon>
+  0x7a888  size=  892  <anon>
+
+=== Functions calling pthread_cond_wait ===
+  0x1cde4  size=  148  <anon>
+  0x3c938  size= 1088  <anon>
+  0x3cd78  size=  528  <anon>
+  0x59bb4  size= 2880  <anon>
+  0x5eebc  size= 1016  <anon>
+  0x5f2b4  size=  328  <anon>
+  0x5f4b4  size=  352  <anon>
+
+=== Functions calling pthread_cond_signal/broadcast ===
+  [pthread_cond_signal      ] 0x1cb14  size=   72  <anon>
+  [pthread_cond_signal      ] 0x1cb5c  size=   96  <anon>
+  [pthread_cond_signal      ] 0x1cbc0  size=  336  <anon>
+  [pthread_cond_signal      ] 0x1ce78  size=   52  <anon>
+  [pthread_cond_signal      ] 0x3c938  size= 1088  <anon>
+  [pthread_cond_signal      ] 0x3cd78  size=  528  <anon>
+  [pthread_cond_signal      ] 0x59bb4  size= 2880  <anon>
+  [pthread_cond_signal      ] 0x5eebc  size= 1016  <anon>
+  [pthread_cond_signal      ] 0x5f2b4  size=  328  <anon>
+  [pthread_cond_signal      ] 0x5f3fc  size=  184  <anon>
+  [pthread_cond_signal      ] 0x5f4b4  size=  352  <anon>

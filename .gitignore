@@ -1,0 +1,20 @@
+# build outputs
+build/
+*.idsig
+
+# host-machine backup tarballs (contain personal save data)
+backups/
+
+# python caches
+__pycache__/
+*.pyc
+
+# editor junk
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# os junk
+.DS_Store
+Thumbs.db
