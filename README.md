@@ -1,11 +1,21 @@
 # drastic-android-mod
 
 Smali patches for [DraStic](https://play.google.com/store/apps/details?id=com.dsemu.drastic)
-that add **"ESC to quick-save and quit, auto-resume on next launch"**
-behaviour to the Nintendo DS emulator, plus a save-on-any-exit-path
-extension. Built and tested on a GammaOS handheld (Rockchip RK3568,
-4x Cortex-A55, Android 14), but nothing in the mod is device-specific -
-it works on any ARM64 Android running DraStic r2.6.0.4a.
+that add a set of quality-of-life behaviours to the Nintendo DS emulator:
+
+- **ESC to quick-save and quit**, with auto-resume on next launch
+- **Save-on-any-exit-path** extension so HOME, BACK, the in-game menu,
+  and the app switcher all write a fresh slot-9 save before teardown
+- **Consistent Xbox-style A=confirm, B=cancel** in every non-game
+  DraStic UI menu (rom picker, state menu, settings, help, cheats,
+  GameMenu, in-game radial overlay)
+- **Start Game actually starts the game** when you press A via
+  controller navigation (fix for a focus bug in every
+  ViewAnimator-based detail panel)
+
+Built and tested on a GammaOS handheld (Rockchip RK3568, 4x Cortex-A55,
+Android 14), but nothing in the mod is device-specific - it works on
+any ARM64 Android running DraStic r2.6.0.4a.
 
 Everything here - source APKs, decompiled trees, the unified-diff patch,
 a full native-binary reverse-engineering writeup, the Python analysis
@@ -87,6 +97,81 @@ so that the save block runs unconditionally (instead of only when
 The only exit path it doesn't catch is a hard SIGKILL (the OOM killer,
 `am force-stop`, pulling the battery). That is a limit of the Android lifecycle; no user-space hook can intercept it.
 
+### 4. Xbox-style A=confirm, B=cancel in non-game UI menus
+
+Stock DraStic routes controller face-button presses through a helper
+class (`Ln0/h;->a()`) that exists for iCade / 8-bitty Bluetooth
+compatibility. The fallthrough handling of `KEYCODE_BUTTON_A` (96) and
+`KEYCODE_BUTTON_B` (97) is inconsistent across activities, and on an
+Xbox-layout controller the bottom face button often did *not* confirm
+menu selections.
+
+The mod inserts a small translation shim (`Ln0/h;->aUi()`) that
+rewrites face-button keycodes into their keyboard equivalents before
+every non-game UI activity's existing `dispatchKeyEvent` path runs:
+
+- `KEYCODE_BUTTON_A` (96) -> `KEYCODE_ENTER` (66) - confirm
+- `KEYCODE_BUTTON_B` (97) -> `KEYCODE_BACK`  (4)  - cancel
+
+Every non-game UI activity (DraSticActivity, RomSelector, StateMenu,
+Cheats, CheatEditor, CheatsCustom, GameMenu, Help, Settings) has its
+`dispatchKeyEvent` redirected to call `aUi()` instead of `a()`.
+`DraSticEmuActivity`, `ui/KeyMapper`, and `ui/KeyMapperTV` are
+deliberately left alone so in-game DS button mapping and the
+keymap-capture screens still see raw gamepad keycodes.
+
+### 5. Xbox-style A=confirm, B=cancel in the in-game radial menu
+
+The radial in-game menu (the circular overlay drawn on top of the
+emulator's GL surface) does not flow through `dispatchKeyEvent` at
+all; its input is routed via the user's in-game keymap and handled by
+`Lo0/b;->k()` directly. Patch 4's translation shim has no effect
+there.
+
+The mod adds a **keymap-independent intercept** at the top of
+`DraSticEmuActivity.onKeyDown` and `onKeyUp`:
+
+- When `DraSticGlView.G == true` (radial menu open) and the event
+  is `KEYCODE_BUTTON_A`: synthesise a DS START press
+  (`DraSticGlView.w0(2, ...)`), which the radial menu code interprets
+  as confirm-on-press.
+- When the event is `KEYCODE_BUTTON_B`: synthesise a DS SELECT press
+  (`DraSticGlView.w0(3, ...)`), which the radial menu interprets as
+  cancel-on-release.
+- When the radial menu is closed: the intercept is skipped entirely
+  and `onKeyDown` falls through to DraStic's normal keymap loop.
+  In-game DS button mapping is untouched.
+
+### 6. Start Game starts the game when you press A via controller
+
+DraStic's ROM-list detail panels (Start Game, State Menu, Help,
+Settings) all maintain two independent selection states: DraStic's own
+orange-highlighted index, and Android view focus. When you enter a
+detail panel by controller, Android auto-focuses the first focusable
+view in traversal order - always the top-left back icon
+(`btn_settings_back_rompick`). Pressing A would translate to ENTER
+via patch 4, `super.dispatchKeyEvent` would deliver ENTER to the
+focused back icon, and the back icon's click listener would fire,
+returning you to the main list instead of starting the game.
+
+The tell-tale was that touch worked fine (touch dispatch bypasses
+focus entirely) and that tapping any blank area of the detail panel
+before pressing A also worked (tapping cleared focus from the back
+icon).
+
+The mod patches `dispatchKeyEvent` in RomSelector, StateMenu, Help,
+and Settings: when the activity's `ViewAnimator` is showing a
+non-zero child (i.e. a detail panel is open) and the translated
+keycode is `KEYCODE_ENTER`, bypass `super.dispatchKeyEvent`
+entirely and invoke the Activity's own `onKeyDown` / `onKeyUp`
+directly. DraStic's own handler then performs `findViewById(h[o]).performClick()`
+on the correct highlighted item, and the game starts.
+
+Main-list behaviour is unchanged (the intercept is only active when
+`displayedChild != 0`), DPAD navigation inside the detail panel still
+goes through `super.dispatchKeyEvent` normally, and touch is never
+affected.
+
 ---
 
 ## Repo layout
@@ -121,7 +206,7 @@ drastic-android-mod/
 |   |-- AndroidManifest.xml
 |   `-- ...
 |
-|-- decoded2/                         <- same tree with the three patches applied (reference copy)
+|-- decoded2/                         <- same tree with all six patches applied (reference copy)
 |   `-- ...
 |
 |-- native/                           <- reverse-engineering workspace for libdrastic_arm64.so
@@ -139,7 +224,7 @@ drastic-android-mod/
 |   `-- summary.txt                   <- top-50 PLT call frequencies, largest fns, mutex/cond callers
 |
 `-- docs/
-    |-- PATCHES.md                    <- line-by-line walkthrough of all three patches
+    |-- PATCHES.md                    <- line-by-line walkthrough of all six patches
     `-- NATIVE_BINARY_FINDINGS.md     <- full reverse-engineering writeup
 ```
 
@@ -339,7 +424,7 @@ re-run the analysis on a different DraStic build.
 ## How the patches work
 
 See [docs/PATCHES.md](docs/PATCHES.md) for the full line-by-line
-walkthrough with before/after smali listings for all three hunks. Short
+walkthrough with before/after smali listings for every hunk. Short
 version:
 
 1. **`onKeyDown`** gets an ESC keycode check inserted before the
@@ -361,10 +446,40 @@ version:
    second forces the sync flag to `true` so teardown can't race the
    save-thread flush.
 
-The patches only touch `smali/com/dsemu/drastic/DraSticEmuActivity.smali`.
-Nothing else in the APK is modified - no native libraries, no
-resources, no manifest. The binary delta between the unmodified APK
-and the modded APK is exclusively the new `classes.dex`.
+4. **`Ln0/h;->aUi()`** is a new helper method on the existing
+   controller-translation class. It rewrites `KEYCODE_BUTTON_A` ->
+   `KEYCODE_ENTER` and `KEYCODE_BUTTON_B` -> `KEYCODE_BACK`, then
+   chains to the pre-existing `a()` method so iCade / 8-bitty
+   compatibility is preserved. Every non-game UI activity's
+   `dispatchKeyEvent` is redirected to call `aUi()` instead of
+   `a()`. In-game (`DraSticEmuActivity`) and the keymap-capture
+   screens (`ui/KeyMapper`, `ui/KeyMapperTV`) still call `a()` so raw
+   keycodes reach the keymap loop unchanged.
+
+5. **`DraSticEmuActivity.onKeyDown` / `onKeyUp`** get a second
+   intercept block inserted before the keymap loop: when
+   `DraSticGlView.G:Z` is true (radial in-game menu is open) and the
+   keycode is `BUTTON_A` or `BUTTON_B`, route the event directly to
+   `DraSticGlView.w0(2, ...)` (DS START bit = confirm) or
+   `w0(3, ...)` (DS SELECT bit = cancel), bypassing the user's
+   keymap for the duration of the overlay. `DraSticGlView.G` is
+   changed from `private` to `public` so EmuActivity can read it
+   via `iget-boolean` without reflection.
+
+6. **`dispatchKeyEvent`** in `ui/RomSelector`, `ui/StateMenu`,
+   `ui/Help`, and `ui/Settings` gets a detail-panel ENTER bypass: if
+   the activity's `ViewAnimator` is showing a non-zero child and the
+   translated keycode is `KEYCODE_ENTER`, call the Activity's own
+   `onKeyDown` / `onKeyUp` directly and return `true` instead of
+   forwarding to `super.dispatchKeyEvent`. This prevents the
+   top-left back icon (which auto-grabs Android focus in every
+   detail panel) from consuming ENTER and sending the user back to
+   the main list.
+
+Nothing outside of the smali classes is modified - no native
+libraries, no resources, no manifest. The binary delta between the
+unmodified APK and the modded APK is exclusively the new
+`classes.dex`.
 
 ---
 

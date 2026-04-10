@@ -5,14 +5,19 @@ The patch set is distributed as a single unified diff at
 automatically by `scripts/build.sh` via `patch -p1`. It touches
 several files:
 
-- `smali/com/dsemu/drastic/DraSticEmuActivity.smali` - patches 1, 2, 3
+- `smali/com/dsemu/drastic/DraSticEmuActivity.smali` - patches 1, 2, 3, 5
+- `smali/com/dsemu/drastic/DraSticGlView.smali` - field visibility for patch 5
 - `smali/n0/h.smali` - new helper for patch 4
-- `smali/m0/y.smali` - radial menu input fix (patch 4)
 - `smali/com/dsemu/drastic/{DraSticActivity,ui/RomSelector,ui/StateMenu,ui/Cheats,ui/CheatEditor,ui/CheatsCustom,ui/GameMenu,ui/Help,ui/Settings}.smali` - dispatchKeyEvent translation hooks (patch 4)
+- `smali/com/dsemu/drastic/ui/{RomSelector,StateMenu,Help,Settings}.smali` - detail-panel ENTER bypass (patch 6)
 
-DraSticEmuActivity, ui/KeyMapper, and ui/KeyMapperTV are deliberately
-NOT touched by patch 4: in-game DS button mapping and the keymap-capture
-screens still see raw, unrewritten gamepad keycodes.
+ui/KeyMapper and ui/KeyMapperTV are deliberately NOT touched by patch
+4: the keymap-capture screens still see raw, unrewritten gamepad
+keycodes so the user can bind their physical face buttons to DS A/B.
+The in-game DS button mapping in DraSticEmuActivity also still uses
+the user's raw keymap; patch 5 only intercepts BUTTON_A/BUTTON_B
+**while the radial in-game menu is open**, and only inside that
+narrow window.
 
 This document explains what each hunk does, why it's there, and how it
 interacts with the rest of DraStic.
@@ -339,136 +344,52 @@ in user space can intercept those.
 
 ---
 
-## Patch 4 - Nintendo-style A/B in all menus and the radial in-game menu
+## Patch 4 - A=confirm, B=cancel in non-gameplay UI activities
 
 ### Symptom
 
-On a GammaOS handheld (RK3568, gammapad-virtualised controller), the
-physical face button labelled "A" did not confirm menu selections.
-Instead, the physical "B" button was acting as confirm, with "A" doing
-nothing or cancelling. Reported as "really inconsistent behaviour
-using the B button as the confirmation button" by the user.
+On the test device (Xbox-layout controller exposed via gammapad), the
+right face button (`KEYCODE_BUTTON_B`) was acting as confirm in
+DraStic's UI menus while the bottom face button (`KEYCODE_BUTTON_A`)
+was acting as cancel or back. Reported as "really inconsistent
+behaviour using the B button as the confirmation button" by the user.
+The user wants the standard Xbox-style mapping: A confirms, B cancels.
 
 ### Root cause
 
-The handheld's physical face buttons follow Nintendo conventions:
-
-- right face button = "A" (Nintendo's primary action button)
-- bottom face button = "B" (Nintendo's secondary action button)
-
-Android's `KEYCODE_BUTTON_A` and `KEYCODE_BUTTON_B` are named after
-the **Xbox** convention, where:
-
-- `KEYCODE_BUTTON_A` (96) = Xbox A = bottom face button
-- `KEYCODE_BUTTON_B` (97) = Xbox B = right face button
-
-The `gammapad` service on this device exposes a virtual gamepad
-(`Location: gammapad-virtual`) that maps physical positions to
-Android keycodes by **physical position**, not by label. So pressing
-the physical button labelled "A" (the right one) emits
-`KEYCODE_BUTTON_B`, and pressing the physical "B" (the bottom one)
-emits `KEYCODE_BUTTON_A`.
-
-DraStic's stock menu input code maps `KEYCODE_BUTTON_A` to confirm
-and `KEYCODE_BUTTON_B` to cancel, following the Xbox convention.
-That is the opposite of what a Nintendo-style handheld user expects.
+DraStic's stock UI activities all route their key events through a
+helper class `Ln0/h;->a(KeyEvent)KeyEvent` which exists to support
+iCade and 8-bitty Bluetooth controllers. The default handler then
+matches `KEYCODE_BUTTON_B` (97) against the system "back" semantics
+in some places and against confirm semantics in others, with
+inconsistent results across activities. The behaviour the user saw
+was the result of that inconsistency, not of a single dispatch table.
 
 ### Fix
 
-Patch 4 swaps the meaning of `KEYCODE_BUTTON_A` (96) and
-`KEYCODE_BUTTON_B` (97) **in every menu input path**. After the
-patch:
+Patch 4 inserts a small **rewrite shim** in front of the existing
+helper. A new method `Ln0/h;->aUi(KeyEvent)KeyEvent` rewrites
+controller face buttons into well-known keyboard keycodes that every
+DraStic UI menu already handles consistently:
 
-- `KEYCODE_BUTTON_B` (97) -> confirm (the user's physical "A")
-- `KEYCODE_BUTTON_A` (96) -> cancel  (the user's physical "B")
-
-DS gameplay button mapping is **not** affected. The user keymap
-loop in `DraSticEmuActivity.onKeyDown` continues to consume raw
-keycodes against `f0/h.i1[]` exactly as the user has configured
-them. Patch 4 only intercepts the input paths that drive **menu
-navigation**, not gameplay.
-
-There are three input paths in DraStic that needed the fix, because
-controller events arrive through different channels depending on
-where the user is:
-
-#### Path 4a - Direct controller callback in `m0/y.a(Ld0/h;)V`
-
-The radial in-game menu (`com.dsemu.drastic.ui.GameMenu`) uses an
-`Lm0/y;` instance that registers itself as a `Ld0/c;` listener with
-the `Ld0/b;` controller manager. When the user presses a controller
-button while the radial menu is open, gammapad delivers a `Ld0/h;`
-event via Binder, the controller manager dispatches it on a Handler,
-and `m0/y.a(Ld0/h;)V` is called directly. **This bypasses Android's
-KeyEvent / dispatchKeyEvent / onKeyDown chain entirely.**
-
-The original code in `m0/y.a()`:
-
-```smali
-const/16 v0, 0x60
-if-eq p1, v0, :cond_2    # BUTTON_A -> :cond_2 -> y$b.i (confirm)
-const/16 v0, 0x61
-if-eq p1, v0, :cond_1    # BUTTON_B -> :cond_1 -> y$b.j (cancel)
-```
-
-Patched:
-
-```smali
-const/16 v0, 0x61
-if-eq p1, v0, :cond_2    # BUTTON_B -> :cond_2 -> y$b.i (confirm)
-const/16 v0, 0x60
-if-eq p1, v0, :cond_1    # BUTTON_A -> :cond_1 -> y$b.j (cancel)
-```
-
-Only the two constants are swapped. The `:cond_1`/`:cond_2`
-destinations and the rest of the method are unchanged. This is the
-hunk that actually fixes the radial menu, because the radial menu
-does not go through Android's dispatchKeyEvent.
-
-#### Path 4b - Keyboard fallback in `m0/y.n(I)Z`
-
-Same `m0/y` class also has `n(I)Z`, which is called from
-`GameMenu.onKeyDown` for events that DO arrive through Android's
-standard KeyEvent path (e.g., a USB keyboard or the system fallback
-when gammapad is not active). The same swap applies for consistency:
-
-```smali
-# was: const/16 v3, 0x60   # BUTTON_A -> goto_2 (confirm)
-const/16 v3, 0x61          # BUTTON_B -> goto_2 (confirm)
-
-# was: const/16 v0, 0x61   # BUTTON_B -> goto_0 (cancel)
-const/16 v0, 0x60          # BUTTON_A -> goto_0 (cancel)
-```
-
-This also incidentally fixes a separate shadowing bug in `n(I)Z`:
-the user-keymap aliases `i1[2]` (DS START) and `i1[3]` (DS SELECT)
-were tested before the hardcoded BUTTON_A/B cases. With the user's
-DS START mapped to a face button keycode, that test fired first and
-routed presses to the wrong action regardless of what the explicit
-BUTTON_A/B fallback said. The swap doesn't fix the precedence
-problem on its own, but the dispatch-time translation in patch 4c
-does, by rewriting the keycode before `n(I)` even sees it.
-
-#### Path 4c - dispatchKeyEvent translation for all UI activities
-
-The third path is Android's standard dispatchKeyEvent flow used by
-every non-game DraStic UI activity (rom selector, state menu,
-cheat editor, settings, help, in-game GameMenu, etc.). DraStic
-already routes every key event in those activities through
-`Ln0/h;->a(KeyEvent)KeyEvent` for an unrelated iCade/8-bitty
-Bluetooth controller compat hack.
-
-Patch 4 adds a new method `Ln0/h;->aUi(KeyEvent)KeyEvent` that
-rewrites the keycode if it is `KEYCODE_BUTTON_A` or `KEYCODE_BUTTON_B`,
-then chains into the existing `a()`. The translation is:
-
-- `KEYCODE_BUTTON_B` (97) -> `KEYCODE_ENTER` (66) - confirm
-- `KEYCODE_BUTTON_A` (96) -> `KEYCODE_BACK` (4)  - cancel
+- `KEYCODE_BUTTON_A` (96) -> `KEYCODE_ENTER` (66) - confirm
+- `KEYCODE_BUTTON_B` (97) -> `KEYCODE_BACK`  (4)  - cancel
 - anything else -> unchanged
 
-The patch then changes each non-gameplay UI activity's
-`dispatchKeyEvent` method to call `aUi()` instead of `a()`. The
-activities patched:
+After translating, `aUi()` chains into the existing `a()` so the
+iCade/8-bitty translation table still runs unchanged. Each non-game
+UI activity's `dispatchKeyEvent` is then redirected to call `aUi()`
+instead of `a()`:
+
+```smali
+# was:
+invoke-virtual {v0, p1}, Ln0/h;->a(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
+
+# now:
+invoke-virtual {v0, p1}, Ln0/h;->aUi(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
+```
+
+The activities patched:
 
 - `com.dsemu.drastic.DraSticActivity`
 - `com.dsemu.drastic.ui.RomSelector`
@@ -490,27 +411,6 @@ These activities are NOT patched (they intentionally still use `a()`):
   the user, so any rewriting would prevent the user from binding
   their physical face buttons to DS A/B.
 
-Each per-activity hunk is a single-token edit:
-
-```smali
-# was:
-invoke-virtual {v0, p1}, Ln0/h;->a(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
-
-# now:
-invoke-virtual {v0, p1}, Ln0/h;->aUi(Landroid/view/KeyEvent;)Landroid/view/KeyEvent;
-```
-
-### Why this is gammapad-specific
-
-The swap is correct for any user whose face buttons report keycodes
-in **Nintendo-by-physical-position** order, which is the gammapad
-default on RK3568 handhelds. A user with a stock Xbox controller
-plugged into a regular phone or tablet (where `KEYCODE_BUTTON_A` is
-their physical A label) would see this patch invert their menu
-controls. If you are building this mod for that kind of device,
-revert patch 4 by editing `patches/drastic.patch` to undo the four
-constant swaps in `m0/y.smali` and the swap in `n0/h.aUi`.
-
 ### What this does not change
 
 - DS gameplay button mapping. The user keymap loop in
@@ -521,3 +421,268 @@ constant swaps in `m0/y.smali` and the swap in `n0/h.aUi`.
 - The iCade/8-bitty Bluetooth controller path inside `Ln0/h;->a()`,
   which is preserved unchanged because `aUi()` chains into `a()`
   after its own translation.
+- The radial in-game menu. That menu does not flow through
+  `dispatchKeyEvent` at all - see patch 5.
+
+---
+
+## Patch 5 - A=confirm, B=cancel in the radial in-game menu
+
+### Symptom
+
+After patch 4 was applied, all of the standalone DraStic UI
+activities (rom selector, state menu, settings, etc.) correctly
+treated `KEYCODE_BUTTON_A` as confirm. The **radial in-game menu**
+(the circular overlay drawn on top of the GL surface during gameplay)
+still required `KEYCODE_BUTTON_B` to make a selection.
+
+### Root cause
+
+The radial menu is not a separate Activity. It is rendered by
+`Lo0/b;` directly on top of the running emulator's GLSurfaceView,
+and its input does not flow through `dispatchKeyEvent` or any of the
+helpers that patch 4 touched. The dispatch chain is:
+
+```
+DraSticEmuActivity.onKeyDown(int, KeyEvent)
+  -> for each i in f0/h.i1[0..28]:
+       if keyCode == i1[i]:
+         DraSticGlView.w0(i, true)         # i is the user's mapped DS button index
+           -> if DraSticGlView.G == true (radial menu open):
+                Lo0/b;->k(i, true)         # update bitmask, fire confirm/cancel transitions
+              else:
+                Ln0/i;->C(i, true)         # in-game DS button press
+```
+
+`Lo0/b;->k(I, Z)V` interprets the DS button index by **bit
+position**:
+
+- bit 2 = DS START -> press transition fires confirm (`g(t, true)`)
+- bit 3 = DS SELECT -> release transition fires cancel (`m.o()`)
+
+The user has DS START mapped to `KEYCODE_BUTTON_B` and DS SELECT
+mapped to `KEYCODE_BUTTON_A` in their keymap. So pressing physical
+B routes through the keymap loop, becomes DS START, sets bit 2,
+fires confirm. Pressing physical A becomes DS SELECT, sets bit 3,
+which only fires cancel on release. That is exactly the
+"B confirms, A does nothing useful" symptom the user reported.
+
+Patch 4 cannot fix this on its own because `dispatchKeyEvent` is
+never called for these events: in EmuActivity, `onKeyDown` consumes
+the event before it would reach `dispatchKeyEvent`, and the keymap
+loop translates the raw keycode into a DS index using the user's
+configuration.
+
+### Fix
+
+Patch 5 adds a **keymap-independent intercept** at the very top of
+`DraSticEmuActivity.onKeyDown` and `onKeyUp`. The intercept:
+
+1. Reads the EmuActivity's `e:DraSticGlView` field.
+2. Reads `DraSticGlView.G:Z` (radial-menu-open flag).
+3. If both are non-null/true and the event is not an auto-repeat,
+   rewrites `KEYCODE_BUTTON_A` and `KEYCODE_BUTTON_B` to the DS bit
+   indices the radial menu actually wants:
+   - `KEYCODE_BUTTON_A` (96) -> `DraSticGlView.w0(2, pressed)` = DS
+     START bit, fires confirm on press
+   - `KEYCODE_BUTTON_B` (97) -> `DraSticGlView.w0(3, pressed)` = DS
+     SELECT bit, fires cancel on release
+4. Returns `true` so the rest of `onKeyDown` (the user keymap loop)
+   does not also fire.
+
+Crucially this is **only active while the radial menu is open**.
+When the menu is closed (`G == false`), `onKeyDown` falls through
+to the user keymap loop unchanged, so the user's in-game DS button
+mapping is untouched.
+
+`DraSticGlView.G` is `private` in the stock APK; patch 5 changes it
+to `public` so EmuActivity can read it via `iget-boolean` without
+needing reflection or a getter helper.
+
+The full inserted block in `onKeyDown`:
+
+```smali
+:cond_esc_skip
+iget-object v0, p0, Lcom/dsemu/drastic/DraSticEmuActivity;->e:Lcom/dsemu/drastic/DraSticGlView;
+
+if-eqz v0, :cond_radial_skip
+
+iget-boolean v1, v0, Lcom/dsemu/drastic/DraSticGlView;->G:Z
+
+if-eqz v1, :cond_radial_skip
+
+if-nez p2, :cond_radial_skip          # ignore auto-repeat
+
+const/16 v1, 0x60                     # KEYCODE_BUTTON_A
+if-ne p1, v1, :cond_radial_b
+
+const/4 v1, 0x2                       # DS START bit position
+const/4 v2, 0x1                       # pressed = true
+invoke-virtual {v0, v1, v2}, Lcom/dsemu/drastic/DraSticGlView;->w0(IZ)V
+
+const/4 v0, 0x1
+return v0
+
+:cond_radial_b
+const/16 v1, 0x61                     # KEYCODE_BUTTON_B
+if-ne p1, v1, :cond_radial_skip
+
+const/4 v1, 0x3                       # DS SELECT bit position
+const/4 v2, 0x1
+invoke-virtual {v0, v1, v2}, Lcom/dsemu/drastic/DraSticGlView;->w0(IZ)V
+
+const/4 v0, 0x1
+return v0
+
+:cond_radial_skip
+```
+
+A symmetric block lives in `onKeyUp`, calling `w0(2, false)` and
+`w0(3, false)`. The release call on bit 3 is what actually fires
+the cancel callback (`m.o()`) inside `Lo0/b;->k()`, which closes
+the radial menu without selecting an item.
+
+### What this does not change
+
+- The user's in-game DS button keymap. Outside the radial menu
+  (`G == false`), `onKeyDown` falls through to the keymap loop
+  exactly as before, and BUTTON_A/B are routed through the user's
+  configured DS mappings.
+- KeyMapper / KeyMapperTV. The radial menu cannot be open during
+  keymap capture, so the intercept never fires there.
+- The iCade/8-bitty Bluetooth controller path. Patch 5 only adds
+  code to EmuActivity; `Ln0/h;->a()` is untouched.
+
+---
+
+## Patch 6 - Route ENTER past the top-left back icon in detail panels
+
+### Symptom
+
+After patch 4 was applied, UI menus correctly treated the bottom face
+button (`KEYCODE_BUTTON_A`) as confirm. But on the ROM list's
+"Start Game" detail screen (and similar detail panels in StateMenu,
+Help, and Settings), pressing A via the controller did **not** start
+the game. Instead it went back to the previous screen. Tapping the
+button with the touchscreen worked fine. Tapping any blank area of
+the detail panel once and *then* pressing A also worked.
+
+### Root cause
+
+DraStic detail panels have two independent selection states:
+
+1. **DraStic's own selection index** (`o:I` in RomSelector, similar
+   fields in the others). This is what draws the orange highlight
+   you see around "Start Game" or other panel items. DraStic's
+   `onKeyDown` uses it as an index into an array of button IDs
+   (`h:[I`) and calls `findViewById(h[o]).performClick()` when the
+   user presses confirm.
+2. **Android view focus**. When the detail panel is shown via
+   controller navigation, Android auto-focuses the first focusable
+   view in traversal order, which for every detail panel is the
+   top-left `btn_settings_back_rompick` icon (a `LinearLayout` that
+   acts as the back arrow).
+
+`dispatchKeyEvent` translates `KEYCODE_BUTTON_A` -> `KEYCODE_ENTER`
+via `aUi()` and then forwards to `super.dispatchKeyEvent`.
+`super.dispatchKeyEvent` delivers the event to the currently focused
+view - the back icon. The back icon's click listener fires, which
+calls `setDisplayedChild(0)`, returning the user to the main list.
+DraStic's own `onKeyDown` detail-panel handler (which would have
+called `performClick` on Start Game) is never invoked because the
+event was already consumed by the focused back view.
+
+Touch works because touch dispatch (`dispatchTouchEvent`) bypasses
+focus entirely. Tapping blank space clears focus on the back icon,
+so a subsequent A press has no focused view for `super.dispatchKeyEvent`
+to deliver ENTER to, and the event falls through to the Activity's
+`onKeyDown`, which consults DraStic's own `o` index and clicks the
+right button.
+
+### Fix
+
+In each affected activity's `dispatchKeyEvent`, after `aUi()`
+translation, detect when:
+
+1. The activity's `ViewAnimator` is showing a non-zero child
+   (detail panel, not main list), and
+2. The translated keycode is `KEYCODE_ENTER` (66).
+
+When both are true, bypass `super.dispatchKeyEvent` entirely and
+invoke the Activity's own `onKeyDown(int, KeyEvent)` or
+`onKeyUp(int, KeyEvent)` directly, then return `true`. This makes
+DraStic's own handler authoritative for confirm in detail panels
+regardless of which view currently holds Android focus.
+
+The inserted block (RomSelector variant):
+
+```smali
+iget-object v0, p0, Lcom/dsemu/drastic/ui/RomSelector;->i:Landroid/widget/ViewAnimator;
+if-eqz v0, :cond_super
+invoke-virtual {v0}, Landroid/widget/ViewAnimator;->getDisplayedChild()I
+move-result v0
+if-eqz v0, :cond_super                   # main list -> normal path
+
+invoke-virtual {p1}, Landroid/view/KeyEvent;->getKeyCode()I
+move-result v0
+const/16 v1, 0x42                        # KEYCODE_ENTER
+if-ne v0, v1, :cond_super
+
+invoke-virtual {p1}, Landroid/view/KeyEvent;->getAction()I
+move-result v1
+if-nez v1, :cond_up_direct                # action != DOWN -> onKeyUp
+
+invoke-virtual {p0, v0, p1}, Lcom/dsemu/drastic/ui/RomSelector;->onKeyDown(ILandroid/view/KeyEvent;)Z
+const/4 v2, 0x1
+return v2
+
+:cond_up_direct
+invoke-virtual {p0, v0, p1}, Lcom/dsemu/drastic/ui/RomSelector;->onKeyUp(ILandroid/view/KeyEvent;)Z
+const/4 v2, 0x1
+return v2
+
+:cond_super
+invoke-super {p0, p1}, Landroid/app/Activity;->dispatchKeyEvent(Landroid/view/KeyEvent;)Z
+move-result p1
+return p1
+```
+
+The same block is inserted into `StateMenu`, `Help`, and `Settings`,
+with the field name adjusted (`StateMenu.i`, `Help.i`, `Settings.e`).
+
+### Why not just fix focus?
+
+An alternative fix would be to `requestFocus()` on the Start Game
+button (or whatever the DraStic-highlighted item is) whenever the
+detail panel is shown. That approach was rejected because:
+
+- It would require tracking the currently-highlighted item's view ID
+  and re-requesting focus whenever DraStic updates its `o` index
+  (e.g., on every DPAD navigation press), because Android focus
+  and DraStic's internal selection would otherwise drift apart.
+- It would also silently make the back icon unreachable from keyboard
+  Tab navigation, which could break accessibility on other form
+  factors.
+- The detail panels also have non-ViewAnimator-managed focusable
+  views (stats, thumbnails) that would all need to be deliberately
+  skipped.
+
+Bypassing `super.dispatchKeyEvent` for the specific case of
+"detail panel open + ENTER pressed" leaves focus handling untouched
+and gives DraStic's own handler authority over the one key that
+actually matters, which is the minimal change that fixes the bug.
+
+### What this does not change
+
+- Main ROM list behaviour. When `displayedChild == 0`, the
+  intercept is skipped and `super.dispatchKeyEvent` runs as
+  before, so the ListView still receives ENTER to trigger
+  `onItemClick`.
+- DPAD navigation inside the detail panel. DPAD_UP/DOWN still go
+  through `super.dispatchKeyEvent`, so Android view focus still
+  moves normally.
+- Touch. Tapping the back icon still works because touch events
+  bypass `dispatchKeyEvent` entirely.
+- Activities without a ViewAnimator (GameMenu, Cheats,
+  CheatEditor, CheatsCustom). They don't have this pattern and
+  are not patched.

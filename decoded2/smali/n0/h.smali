@@ -343,7 +343,7 @@
 
     move-result v0
 
-    const/16 v1, 0x61
+    const/16 v1, 0x60
 
     if-ne v0, v1, :cond_0
 
@@ -364,7 +364,7 @@
     return-object p1
 
     :cond_0
-    const/16 v1, 0x60
+    const/16 v1, 0x61
 
     if-ne v0, v1, :cond_1
 

@@ -1573,6 +1573,46 @@
     return v0
 
     :cond_esc_skip
+    iget-object v0, p0, Lcom/dsemu/drastic/DraSticEmuActivity;->e:Lcom/dsemu/drastic/DraSticGlView;
+
+    if-eqz v0, :cond_radial_skip
+
+    iget-boolean v1, v0, Lcom/dsemu/drastic/DraSticGlView;->G:Z
+
+    if-eqz v1, :cond_radial_skip
+
+    if-nez p2, :cond_radial_skip
+
+    const/16 v1, 0x60
+
+    if-ne p1, v1, :cond_radial_b
+
+    const/4 v1, 0x2
+
+    const/4 v2, 0x1
+
+    invoke-virtual {v0, v1, v2}, Lcom/dsemu/drastic/DraSticGlView;->w0(IZ)V
+
+    const/4 v0, 0x1
+
+    return v0
+
+    :cond_radial_b
+    const/16 v1, 0x61
+
+    if-ne p1, v1, :cond_radial_skip
+
+    const/4 v1, 0x3
+
+    const/4 v2, 0x1
+
+    invoke-virtual {v0, v1, v2}, Lcom/dsemu/drastic/DraSticGlView;->w0(IZ)V
+
+    const/4 v0, 0x1
+
+    return v0
+
+    :cond_radial_skip
     const/4 v0, 0x0
 
     const/4 v1, 0x0
@@ -1660,6 +1700,46 @@
 
     move-result p2
 
+    iget-object v0, p0, Lcom/dsemu/drastic/DraSticEmuActivity;->e:Lcom/dsemu/drastic/DraSticGlView;
+
+    if-eqz v0, :cond_radial_up_skip
+
+    iget-boolean v1, v0, Lcom/dsemu/drastic/DraSticGlView;->G:Z
+
+    if-eqz v1, :cond_radial_up_skip
+
+    if-nez p2, :cond_radial_up_skip
+
+    const/16 v1, 0x60
+
+    if-ne p1, v1, :cond_radial_up_b
+
+    const/4 v1, 0x2
+
+    const/4 v2, 0x0
+
+    invoke-virtual {v0, v1, v2}, Lcom/dsemu/drastic/DraSticGlView;->w0(IZ)V
+
+    const/4 p1, 0x1
+
+    return p1
+
+    :cond_radial_up_b
+    const/16 v1, 0x61
+
+    if-ne p1, v1, :cond_radial_up_skip
+
+    const/4 v1, 0x3
+
+    const/4 v2, 0x0
+
+    invoke-virtual {v0, v1, v2}, Lcom/dsemu/drastic/DraSticGlView;->w0(IZ)V
+
+    const/4 p1, 0x1
+
+    return p1
+
+    :cond_radial_up_skip
     const/4 v0, 0x0
 
     const/4 v1, 0x0

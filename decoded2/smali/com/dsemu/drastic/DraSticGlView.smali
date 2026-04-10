@@ -30,7 +30,7 @@
 
 .field private F:Z
 
-.field private G:Z
+.field public G:Z
 
 .field private H:Z
 

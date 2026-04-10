@@ -605,11 +605,11 @@
 
     move-result p1
 
-    const/16 v0, 0x61
+    const/16 v0, 0x60
 
     if-eq p1, v0, :cond_2
 
-    const/16 v0, 0x60
+    const/16 v0, 0x61
 
     if-eq p1, v0, :cond_1
 
@@ -1346,7 +1346,7 @@
 
     if-eq p1, v3, :cond_7
 
-    const/16 v3, 0x61
+    const/16 v3, 0x60
 
     if-ne p1, v3, :cond_4
 
@@ -1363,7 +1363,7 @@
 
     if-eq p1, v0, :cond_6
 
-    const/16 v0, 0x60
+    const/16 v0, 0x61
 
     if-ne p1, v0, :cond_5
 

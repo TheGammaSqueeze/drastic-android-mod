@@ -5524,7 +5524,7 @@
 
     if-lt v0, v5, :cond_14
 
-    sput v5, Lf0/h;->q:I
+    sput v6, Lf0/h;->q:I
 
     goto :goto_b
 
@@ -5566,7 +5566,7 @@
 
     if-lez v2, :cond_16
 
-    const/16 v0, 0xf
+    const/16 v0, 0x8
 
     if-gt v2, v0, :cond_16
 
