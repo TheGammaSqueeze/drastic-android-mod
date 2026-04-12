@@ -388,6 +388,176 @@ with `_Hires3D`. It applies R/B channel swap (ABGR to ARGB) and
 forces alpha to 0xFF via `orr v2.4s, #0xff, lsl #24`. Every output
 pixel is fully opaque.
 
+## Engine A layer priority bug in non-zygote processes (fix found 2026-04-12)
+
+When `libdrastic_arm64.so` is loaded via `dlopen` + a fake JNI shim from a
+non-zygote Android process (e.g. an `init`-spawned early-boot runner like
+gammaos-nano's QR preview), DraStic's DS 2D compositor renders the wrong
+BG/OBJ layer priority on **Engine A** (the primary 2D engine; bottom screen
+in most games). Engine B is unaffected. Symptoms observed across Pokemon
+Black 2 and Sonic Rush:
+
+- Solid or near-solid rectangles of a real DS BG layer colour
+  (steel blue for sky/ceiling, white for cleared backdrop) rendering
+  **in front** of the 3D or sprite layers that should sit on top.
+- OBJ-layer character sprites completely invisible while the dialog
+  box, background gradient, and text of the same scene render correctly.
+- All games affected, including 2D-only titles. Zygote-child drastic on
+  the same device with the same ROMs renders correctly.
+
+### Root cause
+
+DraStic's `startGame` runs a context fingerprint during init. When the
+fingerprint matches "I am executing inside the real `com.dsemu.drastic`
+APK under zygote", it initialises a set of master-state scalars to
+values that select the **optimised** rendering path. When the fingerprint
+fails (which it does for any non-zygote process using a fake JNI layer),
+it leaves those scalars at defaults that select a fallback rendering
+path whose layer-priority compositing is wrong for Engine A.
+
+We were NOT able to identify the exact byte-pattern the fingerprint
+check reads. Candidates include the JNIEnv/JavaVM vtable layout, the
+class loader identity for `com.dsemu.drastic.DraSticJNI`, or some zygote-
+specific global. The obfuscated pointer at `master+1072`
+(= `&glViewport ^ 0x1AB10BF4DBBE1F0F`) is almost certainly one output of
+this check; in non-zygote processes the XOR produces a value outside the
+48-bit userspace virtual address range, and the code paths that would
+dereference it are never entered.
+
+### The fix
+
+Two-step. Applied in nano's `DrasticRunner::init()`:
+
+**1. `applyConfig` with bit 50 (`_m0`) set.** This is the canonical
+in-binary channel that the real app uses to drive `master+0x4b8`.
+The config converter at `0x17c8c..0x17ca0`:
+
+```
+17c8c: ubfx x14, x11, #50, #1    ; extract bit 50 of the config word
+17ca0: str  w14, [x0, #0x4b8]    ; store into master+0x4b8
+```
+
+Call signature from the non-zygote runner:
+
+```cpp
+static constexpr long kDefaultConfigBits =
+    0x10000000L            // _Threaded3D (bit 28)
+  | 0x10000000000L         // _DisableEdgeMarking (bit 40, optional)
+  | 0x20000000000L         // _Hires3D (bit 41, optional)
+  | 0x4000000000000L;      // _m0 (bit 50) -- REQUIRED for Engine A rendering
+applyConfig(kDefaultConfigBits);
+```
+
+**2. Post-startGame one-shot raw patch of 13 more scalars.** DraStic's
+internal reset inside `startGame` writes these to fallback values within
+the first ~100ms of the startGame thread. A 200ms deferred patch after
+`mStartGameThread.detach()` writes them to the values the real app uses.
+
+| Offset | Size | Nano default | Real-app value | Notes |
+|--------|------|--------------|----------------|-------|
+| `master+0x00010` | 4 | 1 | 6 | paired capability value |
+| `master+0x00014` | 4 | 1 | 6 | paired capability value |
+| `master+0x09140` | 4 | 1 | 0 | **inverted direction** (real app clears, nano keeps set) |
+| `master+0x8b68c` | 4 | 1 | 6 | second cluster, mirrors `+0x10` pattern |
+| `master+0x8b690` | 4 | 1 | 6 | second cluster, mirrors `+0x14` pattern |
+| `master+0x8ba98` | 4 | 2 | 0 | **inverted direction** |
+| `master+0x8bab8` | 4 | 0 | 1 | flag |
+| `master+0x8bad0` | 4 | 0 | 1 | flag |
+| `master+0x8badc` | 4 | 0 | 1 | flag |
+| `master+0x8bae8` | 4 | 0 | 3 | |
+| `master+0x8bb00` | 4 | 0 | 1 | flag |
+| `master+0x8bb10` | 4 | 0 | 1 | flag |
+| `master+0x8bb28` | 4 | 0 | 1 | flag |
+
+All 13 scalars are `uint32_t`. The patch is **one-shot** -- a 30-pass
+100ms monitor confirmed that drastic rewrites these fields once during
+startGame init and never touches them again. Pass 1 (t=100ms) saw 11
+drifts; passes 2-30 saw zero drifts.
+
+A reference implementation fragment:
+
+```cpp
+std::thread([this] {
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    apply_master_patches();
+}).detach();
+
+void apply_master_patches() {
+    uint8_t* m = (uint8_t*)master_base;
+    *(uint32_t*)(m + 0x00010) = 6;
+    *(uint32_t*)(m + 0x00014) = 6;
+    *(uint32_t*)(m + 0x09140) = 0;
+    *(uint32_t*)(m + 0x8b68c) = 6;
+    *(uint32_t*)(m + 0x8b690) = 6;
+    *(uint32_t*)(m + 0x8ba98) = 0;
+    *(uint32_t*)(m + 0x8bab8) = 1;
+    *(uint32_t*)(m + 0x8bad0) = 1;
+    *(uint32_t*)(m + 0x8badc) = 1;
+    *(uint32_t*)(m + 0x8bae8) = 3;
+    *(uint32_t*)(m + 0x8bb00) = 1;
+    *(uint32_t*)(m + 0x8bb10) = 1;
+    *(uint32_t*)(m + 0x8bb28) = 1;
+}
+```
+
+### Diagnostic methodology (reusable)
+
+The fix was found by a "5-dump invariant intersection" technique:
+
+1. Capture 5 master-state dumps from each process (real app + nano),
+   ~1 second apart, both on the same static scene (e.g. a title screen).
+2. For each byte offset, classify it as "invariant across the 5 dumps"
+   on each side.
+3. Keep only offsets where the byte is invariant on BOTH sides but
+   the two sides disagree. These are structural process-context
+   differences, not runtime-dependent state.
+4. Exclude JIT code cache arenas (recognisable as ARM64-instruction-
+   shaped content): typically `master+0x117000..0x135000`,
+   `master+0xa1000..0xa7000`, `master+0xd8000..0xda000`.
+5. Keep only `u32` scalars where both values are small integers
+   (0..15). Anything larger is almost always a pointer or runtime
+   state.
+
+This narrows 2 MB of master state to ~16 scalar diffs. Cross-game
+validation (same 5-dump methodology on a second game) eliminates
+game-state bleedthrough, leaving exactly the process-context fields.
+
+### Things eliminated during the investigation
+
+The fix took 6+ hours of cross-session debugging. Each of these was
+tested and did NOT fix the rendering:
+
+- `applyConfig(0)` (no config bits at all)
+- `_Threaded3D` on/off, `_Hires3D` on/off, `_DisableEdgeMarking` on/off
+- `SCHED_RR` priority (with and without)
+- `renderFrame` vs `getScreenBuffers` (both show the same artifact)
+- `glDisable(GL_BLEND)`, saturation=1.0 forced in the consumer shader
+- Audio init patch at `0x1d760` (reverted -- no change)
+- `game_database.xml` (deleted from cache -- no change)
+- BIOS files (confirmed loading correctly)
+- `SCUDO_OPTIONS=zero_contents=true` + direct `malloc` override
+  (confirmed zeroing every allocation -- no change)
+- TLS (`tpidr_el0`) -- only reads the stack canary, standard bionic
+- SIGSEGV/SIGINT/SIGTERM handlers (drastic only installs SIGINT/SIGTERM)
+- `master+1072` obfuscated pointer -- the XOR value is out of VA range
+  so the dereference code path is never entered
+- `versionCode`, `sdkInt` in `onInit` -- overwritten by config converter
+  and only gates `ASharedMemory` path respectively
+- `customClock` arg to `startGame`: `-1L` required (not `0L`) but
+  not sufficient alone
+- `master+0x10 = 6, master+0x14 = 6` alone -- drastic resets them;
+  only sticks when combined with the full 13-scalar patch
+
+### What the "second cluster" at `master+0x8b68c` represents
+
+The 10 scalars at `master+0x8b68c..0x8bb28` mirror the `6/1`
+capability pattern at `master+0x10/0x14`. Spacing is **not** the
+engine stride (Engine A -> Engine B is `+0x60000` on both Linux and
+Android). This suggests a pair of symmetric feature/capability
+tracking structs -- possibly per-DS-engine fast-path enable tables.
+Exact identification of the struct requires more disasm and is not
+needed to ship the fix.
+
 ## Input bitmask layout (NOT DS KEYINPUT order)
 
 The button bitmask for `updateInput`/`updateFrame` uses a
