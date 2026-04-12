@@ -307,6 +307,102 @@ disassembly live under `tools/`:
 - `tools/disasm.py` - per-function disassembly with PLT and string
   annotation. Usage: `python3 tools/disasm.py 0xADDR`.
 
+## Anti-tamper obfuscated pointer in onInit (`master+1072`)
+
+`onInit` at `0x17df4` computes an obfuscated pointer:
+
+```
+GOT[0x138fd0] -> R_AARCH64_GLOB_DAT -> symbol 253 = glViewport
+
+17e08: ldr x9, [GOT+0x138fd0]         ; x9 = &glViewport (runtime)
+17e0c: mov x10, #0x1ab10bf4dbbe1f0f   ; XOR key
+17e28: eor x8, x9, x10                ; obfuscated pointer
+17e34: str x8, [master+1072]          ; stored for renderer use
+```
+
+The renderer at `0x64544` and 14+ other call sites loads `master+1072`
+and dereferences it as a data pointer to write DS Engine A GPU state
+(BG layer configs, OBJ attributes, 3D clear state, layer priorities).
+
+This is an anti-tamper technique: drastic uses `glViewport`'s runtime
+address as entropy. The XOR key is tuned so that in a zygote-forked
+app process (where libGLESv2 loads at a predictable ASLR address),
+the result points to a valid internal structure.
+
+**Critical for non-zygote contexts (e.g. gammaos-nano):** if
+libGLESv2.so loads at a different base address, the XOR produces a
+pointer to the WRONG memory location. Engine A's GPU state writes
+land at a garbage address while the actual state keeps defaults. This
+causes:
+- White rectangles over 3D content (BG layers with default VRAM)
+- Missing OBJ sprites (OAM tile data never populated)
+- Wrong layer priorities (compositor reads default state)
+- Engine B unaffected (uses a different pointer path)
+
+**Fix for non-zygote processes:** after `onInit`, overwrite
+`master+1072` with the correct internal pointer computed from the
+master base + the right offset. The correct offset can be determined
+by reading `master+1072` in the real drastic app and computing the
+delta from the master base.
+
+## Audio init binder stall and 4-byte patch
+
+`initialize_audio` at `0x1d760` (824 bytes) calls `slCreateEngine`
+which blocks ~15s at cold boot waiting for audioserver via libbinder
+`waitForService`. Single caller at `0x7304c` (inside `initialize_spu`
+at `0x72e34`). Caller does NOT check return value.
+
+**Patch:** replace first instruction at `0x1d760` with `ret`
+(`c0 03 5f d6`). Audio init skipped entirely. The caller pre-writes
+the sample rate (44100) at `[x19]` before the call so the subsequent
+division is safe.
+
+For gameplay beyond title screens, a second patch at `0x1dd6c` (also
+`ret`) is needed to prevent the per-frame audio tick from dereferencing
+NULL audio object pointers. Both patches are in the same 4K page.
+
+See `memory/project_drastic_audio_init_patch.md` for the full
+investigation details.
+
+## renderFrame GL state contract
+
+`renderFrame` at `0x1ceac` (344 bytes) makes exactly 6 GL calls:
+`glBindTexture` x2, `glTexSubImage2D` x2, `glDrawArrays` x2.
+It does NOT call `glUseProgram`, `glVertexAttribPointer`, or any
+other state-management function. It relies entirely on the GL state
+that `fxSetup` left behind.
+
+`fxLoad` (via `0x1ff78`) parses `.dfx` shader files with XML-like
+tags (`<header>`, `<vheader>`, `<fheader>`, `<pass>`, etc) and
+compiles the GL program. `fxSetup` (via `0x20418`) configures the
+viewport, vertex attribs, and textures using the compiled program.
+
+The per-frame render loop requires `waitScreen()` before each
+`renderFrame()` call. Without it, renderFrame reads mid-composition
+frames. `signalScreen` is NOT per-frame -- only for lifecycle events.
+
+## getScreenBuffers format conversion
+
+`getScreenBuffers` at `0x19068` is hardcoded to 256x192 output even
+with `_Hires3D`. It applies R/B channel swap (ABGR to ARGB) and
+forces alpha to 0xFF via `orr v2.4s, #0xff, lsl #24`. Every output
+pixel is fully opaque.
+
+## Input bitmask layout (NOT DS KEYINPUT order)
+
+The button bitmask for `updateInput`/`updateFrame` uses a
+drastic-specific layout, NOT the standard DS KEYINPUT register order:
+
+```
+bit 0  Up      bit 4  A      bit  8  L      bit 11  Select
+bit 1  Down    bit 5  B      bit  9  R      bit 31  Pointer-down
+bit 2  Left    bit 6  X      bit 10  Start
+bit 3  Right   bit 7  Y
+```
+
+Active-high (1=pressed). Bits 12-30 are reserved/trap-doors.
+Source: `decoded/smali/n0/i.smali` array_0 at lines 498-516.
+
 ## Summary
 
 - The rendering pipeline, rasterizer worker pool init, worker
