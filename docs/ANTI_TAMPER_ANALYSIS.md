@@ -12,6 +12,63 @@ have source, comments, or testimony from the author. What follows is
 the most parsimonious explanation of the evidence, plus a walk through
 the concrete disassembly that supports it.
 
+## Summary
+
+DraStic `libdrastic_arm64.so` appears to contain a context fingerprint
+check that distinguishes "running inside the real `com.dsemu.drastic`
+APK under zygote" from "loaded some other way." When the check passes,
+`startGame` initialises a set of master-state scalars to values that
+select an optimised rendering path. When the check fails, those scalars
+are left at defaults that select a subtly broken fallback rendering
+path, causing the DS 2D Engine A compositor to produce wrong BG/OBJ
+layer priorities (white rectangles over 3D, invisible sprites, wrong
+z-order). Engine B and everything else (audio, input, savestates,
+timing) continue to work. There is no crash, warning, or log -- just
+silent visual degradation.
+
+Five pieces of evidence suggest this is deliberate anti-tamper / anti-
+repackaging rather than accidental coupling:
+
+1. `onInit` computes a pointer via `&glViewport XOR 0x1AB10BF4DBBE1F0F`
+   and stores it at `master+1072`. There is no legitimate engineering
+   reason to XOR a function address to derive a data pointer; this is
+   textbook obfuscation, tuned so the XOR result is a valid pointer
+   only in the zygote ASLR layout.
+2. The GPU compositor dispatch table has two modes (1 and 2) that
+   unconditionally dereference `master+1072` with no null/bounds
+   check. If the obfuscated pointer is invalid the code path
+   SIGSEGVs. The games we tested happen to never enter those modes,
+   so the tripwire sits unused but ready.
+3. The 14 scalar fields that differ between "trusted" and
+   "untrusted" runs form a coherent trust-tier pattern: three
+   distinct capability levels (7 downgraded to 6 or 1),
+   inverted-direction flags that real app clears but nano keeps
+   set, and a symmetric 10-scalar feature-enable table.
+4. The critical bit `_m0` (config bit 50) is reachable from the
+   public `applyConfig` config word rather than hard-coded in
+   native code. Routing it through config means the pathway is
+   opt-in -- designed so something could fail to set it (a
+   tampered smali, a stripped APK, a fake JNI caller).
+5. The fallback rendering path has never been tested for visual
+   correctness. It renders garbage layer priorities rather than
+   just being slower. This matches "orphaned debug path that only
+   runs for untrusted callers and was never meant to be user-
+   visible" rather than "legitimate fallback for real hardware
+   variance."
+
+Likely motivation is anti-piracy / anti-repackaging from DraStic's
+commercial era (paid on the Play Store ~2012), plus anti-competitor
+for core extraction (exactly what gammaos-nano does today: dlopen
+the library with a fake JNI shim). The mechanism is "casual
+deterrent" strength, not hardened DRM -- 14 integer patches defeat
+it entirely.
+
+The fix shipped in gammaos-nano: set config bit 50 via applyConfig
+(for `master+0x4b8`), plus a 200ms-deferred one-shot raw patch of
+the other 13 master-state scalars to the values observed in the real
+app. See `NATIVE_BINARY_FINDINGS.md` for the exact offsets and
+reference implementation.
+
 ## What the mechanism does (observable behavior)
 
 When the library is loaded into any process that is not a zygote-forked
